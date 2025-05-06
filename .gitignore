@@ -1,0 +1,3 @@
+wildfire-env
+# Ignore all .hdf files since they are too large
+*.hdf
