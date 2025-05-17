@@ -16,6 +16,7 @@ AI for Wildfire Spread Prediction: Generate predictive wildfire spread maps base
     - Here is a list of arguments we used for our model discussed in the project paper:
 ```bash
     --burn_dir ../data/burn_wc_tensors \
+    --ndvi_dir .../data/ndvi_west_coast_tensors \
     --balance_fire \
     --curriculum_learning \
     --curriculum_start 10 \
@@ -33,7 +34,11 @@ AI for Wildfire Spread Prediction: Generate predictive wildfire spread maps base
     - Here is a list of arguments we used to obtain the results discussed in our paper:
 
 ```bash
-    --checkpoint ./new_model/wgan_improved_run2/curriculum_cosine/wgan_ndvi_improved_checkpoint_epoch_100.pt --ndvi_dir ../data/2020_data/2020_NDVI_wc_tensors --burn_dir ../data/2020_data/2020_burn_wc_tensors --ndvi_tif_dir ../data/2020_data/2020_NDVI_wc_tif --start_day 230 --end_day 270 --threshold .05
+    --checkpoint ./new_model/wgan_improved_run2/curriculum_cosine/wgan_ndvi_improved_checkpoint_epoch_100.pt \
+    --ndvi_dir ../data/2020_data/2020_NDVI_wc_tensors \
+    --burn_dir ../data/2020_data/2020_burn_wc_tensors \
+    --ndvi_tif_dir ../data/2020_data/2020_NDVI_wc_tif \
+    --start_day 230 --end_day 270 --threshold .05
 ```
 - The testing program will output visualizations and a summary of the metrics for the testing run.
 
