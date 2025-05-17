@@ -16,7 +16,7 @@ AI for Wildfire Spread Prediction: Generate predictive wildfire spread maps base
     - Here is a list of arguments we used for our model discussed in the project paper:
 ```bash
     --burn_dir ../data/burn_wc_tensors \
-    --ndvi_dir .../data/ndvi_west_coast_tensors \
+    --ndvi_dir ../data/ndvi_west_coast_tensors \
     --balance_fire \
     --curriculum_learning \
     --curriculum_start 10 \
