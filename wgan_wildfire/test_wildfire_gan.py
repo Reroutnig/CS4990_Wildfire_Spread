@@ -8,6 +8,9 @@ from pathlib import Path
 import glob
 import pandas as pd
 from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
+import rasterio
+from rasterio.plot import show
+from skimage.transform import resize
 
 # Import your model and utility functions
 from models import Generator, Critic
@@ -75,8 +78,31 @@ def find_nearest_ndvi_day(day):
     Finds the nearest day with available NDVI data
     """
     # Reference days where NDVI values are available (start of each month)
-    ndvi_days = [1, 32, 60,61, 91,92, 121,122, 152,153, 182,183, 213,214, 244,245, 274,275, 305,306, 335,336]
+    ndvi_days = [1, 32, 61, 92, 122, 153, 183, 214, 245, 275, 306, 336]
     return min(ndvi_days, key=lambda x: abs(x - day))
+
+def get_ndvi_tif_path(day, ndvi_tif_dir):
+    """
+    Find the appropriate NDVI tif file for the given day
+    """
+    ndvi_day = find_nearest_ndvi_day(day)
+    # Adjust this pattern to match your actual file naming convention
+    ndvi_tif_path = os.path.join(ndvi_tif_dir, f"NDVI_2020_{ndvi_day}.tif")
+    
+    # If the exact file doesn't exist, try to find a matching one
+    if not os.path.exists(ndvi_tif_path):
+        possible_files = glob.glob(os.path.join(ndvi_tif_dir, f"*_{ndvi_day}*.tif"))
+        if possible_files:
+            ndvi_tif_path = possible_files[0]
+        else:
+            # Fallback: just get any NDVI tif file
+            all_tifs = glob.glob(os.path.join(ndvi_tif_dir, "*.tif"))
+            if all_tifs:
+                ndvi_tif_path = all_tifs[0]
+            else:
+                raise FileNotFoundError(f"No NDVI tif files found in {ndvi_tif_dir}")
+    
+    return ndvi_tif_path
 
 def create_test_sequence(ndvi_dir, burn_dir, day, history_days=3, device='cpu'):
     """
@@ -214,8 +240,99 @@ def generate_prediction(generator, ndvi, burn_history, device):
     
     return prediction
 
+def visualize_prediction_with_original_ndvi(prediction, ground_truth, ndvi_tif_path, save_path=None, title=None):
+    """
+    Visualize fire prediction overlaid on original NDVI tif file
+    
+    Args:
+        prediction: Model prediction tensor (in [0,1] range)
+        ground_truth: Ground truth tensor (in [0,1] range)
+        ndvi_tif_path: Path to the original NDVI tif file
+        save_path: Path to save the visualization
+        title: Optional title for the visualization
+    """
+    # Convert tensors to numpy if needed
+    if isinstance(prediction, torch.Tensor):
+        prediction = prediction.detach().cpu().numpy()
+    if isinstance(ground_truth, torch.Tensor):
+        ground_truth = ground_truth.detach().cpu().numpy()
+    
+    # Squeeze dimensions if needed
+    if len(prediction.shape) > 2:
+        prediction = prediction.squeeze()
+    if len(ground_truth.shape) > 2:
+        ground_truth = ground_truth.squeeze()
+    
+    # Check if NDVI tif file exists
+    if not os.path.exists(ndvi_tif_path):
+        print(f"Warning: NDVI tif file not found: {ndvi_tif_path}")
+        # Fall back to standard visualization
+        visualize_validation(prediction, ground_truth, save_path=save_path, title=title)
+        return
+    
+    try:
+        # Create figure and axes
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        
+        # Add title if provided
+        if title:
+            fig.suptitle(title, fontsize=16)
+        
+        # 1. Show original NDVI data
+        with rasterio.open(ndvi_tif_path) as src:
+            ndvi_img = src.read(1)  # Read the first band
+            
+            # Resize if dimensions don't match
+            if ndvi_img.shape != prediction.shape:
+                ndvi_img = resize(ndvi_img, prediction.shape, 
+                                preserve_range=True, anti_aliasing=True)
+            
+            # Normalize NDVI for display
+            vmin, vmax = np.nanpercentile(ndvi_img, (1, 99))
+            im0 = axes[0, 0].imshow(ndvi_img, cmap='YlGn', vmin=vmin, vmax=vmax)
+            axes[0, 0].set_title('Original NDVI')
+            fig.colorbar(im0, ax=axes[0, 0])
+        
+        # 2. Show fire prediction
+        im1 = axes[0, 1].imshow(prediction, cmap='Reds', vmin=0, vmax=1)
+        axes[0, 1].set_title('Fire Prediction')
+        fig.colorbar(im1, ax=axes[0, 1])
+        
+        # 3. Overlay prediction on NDVI
+        axes[1, 0].imshow(ndvi_img, cmap='YlGn', vmin=vmin, vmax=vmax)
+        # Create a mask for fire prediction
+        fire_mask = prediction > 0.5  # Threshold for clearer visualization
+        overlay = np.zeros((*fire_mask.shape, 4))  # RGBA
+        overlay[fire_mask, 0] = 1.0  # Red for fire
+        overlay[fire_mask, 3] = 0.7  # Alpha (transparency)
+        axes[1, 0].imshow(overlay)
+        axes[1, 0].set_title('Prediction Overlay on NDVI')
+        
+        # 4. Overlay ground truth on NDVI
+        axes[1, 1].imshow(ndvi_img, cmap='YlGn', vmin=vmin, vmax=vmax)
+        gt_mask = ground_truth > 0.5
+        gt_overlay = np.zeros((*gt_mask.shape, 4))
+        gt_overlay[gt_mask, 0] = 1.0  # Red for fire
+        gt_overlay[gt_mask, 3] = 0.7  # Alpha
+        axes[1, 1].imshow(gt_overlay)
+        axes[1, 1].set_title('Ground Truth Overlay on NDVI')
+        
+        plt.tight_layout()
+        
+        # Save or show
+        if save_path:
+            plt.savefig(save_path, dpi=150)
+            plt.close()
+        else:
+            plt.show()
+            
+    except Exception as e:
+        print(f"Error in visualization with NDVI tif: {e}")
+        # Fall back to standard visualization
+        visualize_validation(prediction, ground_truth, save_path=save_path, title=title)
+
 def test_model(generator, ndvi_dir, burn_dir, output_dir, start_day, end_day, 
-               history_days=3, device='cpu', threshold=0.5, post_process=True,
+               ndvi_tif_dir=None, history_days=3, device='cpu', threshold=0.5, post_process=True,
                min_area=0, max_gap=0, checkpoint_path=None):
     """
     Test model on specified days
@@ -264,13 +381,27 @@ def test_model(generator, ndvi_dir, burn_dir, output_dir, start_day, end_day,
             metrics['day'] = day
             all_metrics.append(metrics)
             
-            # Save visualization
+            # Standard visualization
             visualize_validation(
                 prediction[0].cpu(), 
                 curr_burn[0].cpu(),
                 save_path=os.path.join(output_dir, f"day_{day}_prediction.png"),
                 title=f"Day {day} - IoU: {metrics['iou']:.4f}, F1: {metrics['f1']:.4f}"
             )
+            
+            # Visualization with NDVI tif if path is provided
+            if ndvi_tif_dir:
+                try:
+                    ndvi_tif_path = get_ndvi_tif_path(day, ndvi_tif_dir)
+                    visualize_prediction_with_original_ndvi(
+                        prediction[0].cpu(),
+                        curr_burn[0].cpu(),
+                        ndvi_tif_path,
+                        save_path=os.path.join(output_dir, f"day_{day}_prediction_with_ndvi.png"),
+                        title=f"Day {day} - IoU: {metrics['iou']:.4f}, F1: {metrics['f1']:.4f}"
+                    )
+                except Exception as e:
+                    print(f"Error creating NDVI overlay visualization: {e}")
             
         except Exception as e:
             print(f"Error processing day {day}: {e}")
@@ -431,6 +562,7 @@ if __name__ == "__main__":
     parser.add_argument('--checkpoint', type=str, required=True, help='Path to model checkpoint')
     parser.add_argument('--ndvi_dir', type=str, default='../data/ndvi_west_coast_tensors', help='Directory with NDVI tensors')
     parser.add_argument('--burn_dir', type=str, default='../data/burn_wc_tensors', help='Directory with burn tensors')
+    parser.add_argument('--ndvi_tif_dir', type=str, default=None, help='Directory with original NDVI tif files')
     parser.add_argument('--output_dir', type=str, default='test_results', help='Directory to save test results')
     parser.add_argument('--start_day', type=int, required=True, help='First day to test (day of year)')
     parser.add_argument('--end_day', type=int, required=True, help='Last day to test (day of year)')
@@ -466,6 +598,7 @@ if __name__ == "__main__":
             ndvi_dir=args.ndvi_dir,
             burn_dir=args.burn_dir,
             output_dir=output_dir,
+            ndvi_tif_dir=args.ndvi_tif_dir,
             start_day=args.start_day,
             end_day=args.end_day,
             history_days=args.history_days,

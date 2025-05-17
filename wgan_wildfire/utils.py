@@ -2,6 +2,8 @@ import torch
 import numpy as np
 from scipy import ndimage
 import matplotlib.pyplot as plt
+import rasterio
+from rasterio.plot import show
 
 # ------------------------------
 # Post-Processing Function for Spatial Constraints
@@ -404,6 +406,93 @@ def visualize_fire_distribution(predictions, ground_truth, save_path=None, epoch
     # Add overall title if epoch provided
     if epoch is not None:
         plt.suptitle(f'Fire Distribution Analysis - Epoch {epoch}', fontsize=16)
+    
+    plt.tight_layout()
+    
+    # Save or show
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+def visualize_prediction_with_original_ndvi(prediction, ground_truth, ndvi_tif_path, save_path=None, title=None):
+    """
+    Visualize fire prediction overlaid on original NDVI tif file
+    
+    Args:
+        prediction: Model prediction tensor (in [0,1] range)
+        ground_truth: Ground truth tensor (in [0,1] range)
+        ndvi_tif_path: Path to the original NDVI tif file
+        save_path: Path to save the visualization
+        title: Optional title for the visualization
+    """
+    # Convert tensors to numpy if needed
+    if isinstance(prediction, torch.Tensor):
+        prediction = prediction.detach().cpu().numpy()
+    if isinstance(ground_truth, torch.Tensor):
+        ground_truth = ground_truth.detach().cpu().numpy()
+    
+    # Squeeze dimensions if needed
+    if len(prediction.shape) > 2:
+        prediction = prediction.squeeze()
+    if len(ground_truth.shape) > 2:
+        ground_truth = ground_truth.squeeze()
+    
+    # Open the original NDVI tif file
+    with rasterio.open(ndvi_tif_path) as src:
+        ndvi_original = src.read(1)  # Read the first band
+        
+        # You might need to resize if dimensions don't match
+        if ndvi_original.shape != prediction.shape:
+            from skimage.transform import resize
+            ndvi_original = resize(ndvi_original, prediction.shape, 
+                                   preserve_range=True, anti_aliasing=True)
+    
+    # Create figure and axes
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    
+    # Add title if provided
+    if title:
+        fig.suptitle(title, fontsize=16)
+    
+    # 1. Show original NDVI data
+    with rasterio.open(ndvi_tif_path) as src:
+        show(src, ax=axes[0, 0], title="Original NDVI")
+    
+    # 2. Show fire prediction
+    im1 = axes[0, 1].imshow(prediction, cmap='Reds', vmin=0, vmax=1)
+    axes[0, 1].set_title('Fire Prediction')
+    fig.colorbar(im1, ax=axes[0, 1])
+    
+    # 3. Overlay prediction on original NDVI
+    with rasterio.open(ndvi_tif_path) as src:
+        show(src, ax=axes[1, 0])
+    
+    # Create a mask for fire prediction
+    fire_mask = prediction > 0.5  # Threshold for clearer visualization
+    
+    # Create overlay
+    overlay = np.zeros((*fire_mask.shape, 4))  # RGBA
+    overlay[fire_mask, 0] = 1.0  # Red for fire
+    overlay[fire_mask, 1] = 1.0
+    overlay[fire_mask, 2] = 0.0
+    overlay[fire_mask, 3] = 0.85  # Alpha (transparency)
+    axes[1, 0].imshow(overlay)
+    axes[1, 0].set_title('Prediction Overlay on NDVI')
+    
+    # 4. Overlay ground truth on original NDVI
+    with rasterio.open(ndvi_tif_path) as src:
+        show(src, ax=axes[1, 1])
+    
+    gt_mask = ground_truth > 0.5
+    gt_overlay = np.zeros((*gt_mask.shape, 4))
+    gt_overlay[gt_mask, 0] = 1.0  # Red for fire
+    gt_overlay[gt_mask, 1] = 1.0
+    gt_overlay[gt_mask, 2] = 0.0
+    gt_overlay[gt_mask, 3] = 0.85  # Alpha
+    axes[1, 1].imshow(gt_overlay)
+    axes[1, 1].set_title('Ground Truth Overlay on NDVI')
     
     plt.tight_layout()
     
