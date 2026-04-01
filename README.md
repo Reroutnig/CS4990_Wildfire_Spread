@@ -9,7 +9,7 @@ AI for Wildfire Spread Prediction: Generate predictive wildfire spread maps base
 ### GIS Fire Map
 Satellite fire detection data was overlaid onto a GIS map to visualize active fire pixel locations geographically across the west coast.
 
-<img width="776" height="914" alt="gis_fire_image" src="https://github.com/user-attachments/assets/4658d023-0b38-424c-8b29-29fb87197f28" />
+<img width="400" alt="gis_fire_image" src="https://github.com/user-attachments/assets/4658d023-0b38-424c-8b29-29fb87197f28" />
 
 ### Rasterized Fire Imagery
 Raw satellite imagery was converted into binary rasters distinguishing fire pixels from non-fire pixels, forming the ground truth labels used for model training.
