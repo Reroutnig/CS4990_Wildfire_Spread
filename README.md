@@ -14,12 +14,12 @@ Satellite fire detection data was overlaid onto a GIS map to visualize active fi
 ### Rasterized Fire Imagery
 Raw satellite imagery was converted into binary rasters distinguishing fire pixels from non-fire pixels, forming the ground truth labels used for model training.
 
-<img width="476" height="736" alt="converted_fire_image" src="https://github.com/user-attachments/assets/922f7377-c553-4de6-a3c5-2660cd91da4c" />
+<img width="300" alt="converted_fire_image" src="https://github.com/user-attachments/assets/922f7377-c553-4de6-a3c5-2660cd91da4c" />
 
 ### Vegetation (NDVI) Satellite Imagery
 The model uses NDVI (Normalized Difference Vegetation Index) satellite imagery as input, which captures vegetation density and health across the landscape.
 
-<img width="480" height="742" alt="vegetation_image" src="https://github.com/user-attachments/assets/2489b49a-b6c9-4d12-9900-e331da2985f6" />
+<img width="300" alt="vegetation_image" src="https://github.com/user-attachments/assets/2489b49a-b6c9-4d12-9900-e331da2985f6" />
 
 ---
 
@@ -28,7 +28,7 @@ The model uses NDVI (Normalized Difference Vegetation Index) satellite imagery a
 ### Early Training Challenges
 Because fire pixels are rare relative to non-fire pixels, the model initially struggled to learn the fire dataset and defaulted to learning primarily from the vegetation data. This caused the model to predict that the entire west coast was on fire, as shown below.
 
-<img width="740" height="916" alt="poor_model_prediction" src="https://github.com/user-attachments/assets/f9f511e4-1aa2-474d-ae45-649ebc30735d" />
+<img width="400" alt="poor_model_prediction" src="https://github.com/user-attachments/assets/f9f511e4-1aa2-474d-ae45-649ebc30735d" />
 
 This class imbalance issue was addressed through fire pixel balancing, curriculum learning, and tuning the fire loss weight during training.
 
@@ -39,7 +39,7 @@ This class imbalance issue was addressed through fire pixel balancing, curriculu
 ### Model Performance
 The final trained model achieved high accuracy and performed well at predicting non-fire pixels. However due to the rarity of fire events in the dataset, the model has a tendency toward false positives and struggles to pinpoint the exact location of fire spread. As a result the model has lower precision and IoU scores, which would likely improve with a larger and more balanced training dataset.
 
-<img width="628" height="442" alt="model_metrics_2" src="https://github.com/user-attachments/assets/138b0f02-95c5-44af-b386-ff8eed6757bf" />
+<img width="400" alt="model_metrics_2" src="https://github.com/user-attachments/assets/138b0f02-95c5-44af-b386-ff8eed6757bf" />
 
 ### Final Model Losses
 | Metric | Value |
@@ -49,7 +49,7 @@ The final trained model achieved high accuracy and performed well at predicting 
 | Gradient Penalty (GP) Loss | 0.004 |
 
 ### Prediction vs Ground Truth
-<img width="1724" height="588" alt="prediction_v_ground_truth_2" src="https://github.com/user-attachments/assets/4a0a23bf-a97b-4b41-ba39-f87a2dea7230" />
+<img width="800" alt="prediction_v_ground_truth_2" src="https://github.com/user-attachments/assets/4a0a23bf-a97b-4b41-ba39-f87a2dea7230" />
 
 ---
 
